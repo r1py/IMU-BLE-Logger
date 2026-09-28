@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07101d">
+<title>IMU BLE Logger</title>
+<style>
+:root{--bg:#06101b;--card:#0d1b2c;--card2:#12243a;--line:#213852;--text:#eef6ff;--muted:#8fa5bd;
+  --green:#35d07f;--blue:#5aaaff;--orange:#ffb454;--red:#ff6575;--cyan:#54e6ff}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 20% 0,#132a45,#06101b 45%,#040b13);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.app{max-width:980px;margin:auto;padding:14px 14px 30px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+h1{margin:0;font-size:22px}
+.sub,.hint,.small{color:var(--muted);font-size:11px}
+.conn{padding:8px 12px;border:1px solid var(--line);border-radius:99px;font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:6px}
+.on .dot{background:var(--green)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:rgba(13,27,44,.95);border:1px solid var(--line);border-radius:19px;padding:14px;box-shadow:0 10px 32px #0004}
+.full{grid-column:1/-1}
+.title{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.actions{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+button{border:0;border-radius:13px;padding:13px 9px;min-height:46px;font-weight:800;color:#07101b;background:#dcecff}
+button:disabled{opacity:.27;filter:grayscale(.7)}
+.blue{background:var(--blue)}.green{background:var(--green)}.orange{background:var(--orange)}
+.red{background:var(--red);color:#fff}
+.state{font-size:18px;font-weight:800;margin-top:12px}
+.bar{height:7px;background:#172a40;border-radius:99px;overflow:hidden;margin-top:9px}
+.fill{height:100%;width:0;background:var(--cyan)}
+.axes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.axis{background:var(--card2);border-radius:13px;padding:10px}
+.axis b{font-size:11px;color:var(--muted)}
+.val{font-size:22px;margin-top:4px;font-variant-numeric:tabular-nums}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.metric{background:var(--card2);border-radius:13px;padding:10px}
+.metric strong{font-size:18px}
+canvas{width:100%;height:250px;background:#081522;border-radius:13px}
+.footer{text-align:center;color:var(--muted);font-size:10px;margin-top:12px}
+@media(max-width:720px){
+  .grid{grid-template-columns:1fr}.full{grid-column:auto}
+  .actions{grid-template-columns:1fr 1fr}.actions button:first-child{grid-column:1/-1}
+  .metrics{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div>
+    <h1>📈 IMU BLE Logger</h1>
+    <div class="sub">Embedded recorder · 100 Hz · stored on the board</div>
+  </div>
+  <div id="conn" class="conn"><span class="dot"></span><span id="ct">Disconnected</span></div>
+</header>
+
+<div class="grid">
+
+  <section class="card full">
+    <div class="title">Controls</div>
+    <div class="actions">
+      <button id="connect" class="blue">Bluetooth</button>
+      <button id="cal" class="orange" disabled>Calibrate 5 s</button>
+      <button id="start" class="green" disabled>▶ New recording</button>
+      <button id="stop" class="red" disabled>■ Stop</button>
+      <button id="dl" disabled>↓ Download CSV</button>
+    </div>
+    <div id="state" class="state">Disconnected</div>
+    <div id="hint" class="hint">The recording is stored on the board. The browser does not store any data.</div>
+    <div class="bar"><div id="fill" class="fill"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="title">Accelerometer · g</div>
+    <div class="axes">
+      <div class="axis"><b>X</b><div id="ax" class="val">—</div></div>
+      <div class="axis"><b>Y</b><div id="ay" class="val">—</div></div>
+      <div class="axis"><b>Z</b><div id="az" class="val">—</div></div>
+    </div>
+    <div class="small">Norm: <b id="an">—</b> g</div>
+  </section>
+
+  <section class="card">
+    <div class="title">Corrected gyroscope · °/s</div>
+    <div class="axes">
+      <div class="axis"><b>X</b><div id="gx" class="val">—</div></div>
+      <div class="axis"><b>Y</b><div id="gy" class="val">—</div></div>
+      <div class="axis"><b>Z</b><div id="gz" class="val">—</div></div>
+    </div>
+    <div class="small">Offset removed by calibration</div>
+  </section>
+
+  <section class="card full">
+    <div class="title">Calibration</div>
+    <div class="axes">
+      <div class="axis"><b>GX offset</b><div id="ox" class="val">—</div><div class="small">σ <span id="sx">—</span></div></div>
+      <div class="axis"><b>GY offset</b><div id="oy" class="val">—</div><div class="small">σ <span id="sy">—</span></div></div>
+      <div class="axis"><b>GZ offset</b><div id="oz" class="val">—</div><div class="small">σ <span id="sz">—</span></div></div>
+    </div>
+  </section>
+
+  <section class="card full">
+    <div class="title">Live recording</div>
+    <div class="metrics">
+      <div class="metric"><div class="small">Samples</div><strong id="count">0</strong></div>
+      <div class="metric"><div class="small">Duration</div><strong id="dur">00:00</strong></div>
+      <div class="metric"><div class="small">Temperature</div><strong id="temp">— °C</strong></div>
+      <div class="metric"><div class="small">Sample rate</div><strong id="rate">— Hz</strong></div>
+    </div>
+  </section>
+
+  <section class="card full">
+    <div class="title">Live chart</div>
+    <canvas id="chart" width="900" height="250"></canvas>
+    <div class="hint">The chart is indicative (10 Hz, last 10 s). The recording stored on the board (100 Hz) is the reference data.</div>
+  </section>
+
+  <section class="card full">
+    <div class="title">Recording on the board</div>
+    <div class="axes">
+      <div class="axis"><b>Status</b><div id="fs" class="val">—</div></div>
+      <div class="axis"><b>Samples</b><div id="fc" class="val">0</div></div>
+      <div class="axis"><b>Duration</b><div id="fd" class="val">0.0 s</div></div>
+    </div>
+    <div class="hint">Capacity: 60 s at 100 Hz. A new recording replaces the previous one. The recording stays on the board if the phone disconnects, but is lost if the board is powered off.</div>
+  </section>
+
+</div>
+<div class="footer">IMU BLE Logger · recordings are stored on the board</div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Configuration - must match the firmware (docs/PROTOCOL.md)
+// ---------------------------------------------------------------------------
+const DEVICE_NAME = "IMU-LOGGER";
+const UUID = {
+  service: "7c6e0001-6f3d-4f9d-9b5e-8f4f2a1b1000",
+  live:    "7c6e0002-6f3d-4f9d-9b5e-8f4f2a1b1000",
+  command: "7c6e0003-6f3d-4f9d-9b5e-8f4f2a1b1000",
+  status:  "7c6e0004-6f3d-4f9d-9b5e-8f4f2a1b1000",
+  offset:  "7c6e0005-6f3d-4f9d-9b5e-8f4f2a1b1000",
+  data:    "7c6e0006-6f3d-4f9d-9b5e-8f4f2a1b1000",
+  meta:    "7c6e0007-6f3d-4f9d-9b5e-8f4f2a1b1000"
+};
+const HEADER_MAGIC = 0x31554D49;  // "IMU1"
+const HEADER_SIZE = 20, RECORD_SIZE = 18, SAMPLE_RATE = 100;
+const CHART_WINDOW_US = 10e6;     // chart shows the last 10 seconds
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let device, commandChr;
+let connected = false, recording = false, calibrating = false, transferring = false;
+let chunks = [];                  // raw download stream, in arrival order
+let storedSamples = 0, storedBytes = 0;
+let liveSamples = 0, firstT = null, lastT = null, history = [];
+
+const $ = id => document.getElementById(id);
+const fixed = (x, n = 2) => Number(x).toFixed(n);
+const view = e => new DataView(e.target.value.buffer, e.target.value.byteOffset, e.target.value.byteLength);
+
+// ---------------------------------------------------------------------------
+// UI helpers
+// ---------------------------------------------------------------------------
+function updateButtons() {
+  const busy = recording || calibrating || transferring;
+  $("connect").disabled = connected;
+  $("cal").disabled = !connected || busy;
+  $("start").disabled = !connected || busy;
+  $("stop").disabled = !connected || !recording;
+  $("dl").disabled = !connected || busy || !storedSamples;
+}
+function setState(title, hint) { $("state").textContent = title; $("hint").textContent = hint; }
+function setConnectionPill(on) {
+  $("conn").classList.toggle("on", on);
+  $("ct").textContent = on ? "Connected" : "Disconnected";
+}
+function renderStored() {
+  const n = recording ? liveSamples : storedSamples;
+  $("fs").textContent = recording ? "Recording" : (storedSamples ? "Available" : "Empty");
+  $("fc").textContent = n.toLocaleString("en-US");
+  $("fd").textContent = (n / SAMPLE_RATE).toFixed(1) + " s";
+}
+function sendCommand(c) {
+  if (commandChr) commandChr.writeValueWithoutResponse(new Uint8Array([c.charCodeAt(0)]));
+}
+
+// ---------------------------------------------------------------------------
+// Bluetooth connection
+// ---------------------------------------------------------------------------
+async function connect() {
+  if (!navigator.bluetooth) { alert("Web Bluetooth is not available. Use Chrome on Android, desktop Chrome, or Edge."); return; }
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: DEVICE_NAME, services: [UUID.service] }]
+    });
+    device.addEventListener("gattserverdisconnected", () => {
+      connected = recording = calibrating = transferring = false;
+      updateButtons();
+      setConnectionPill(false);
+      setState("Disconnected", "The recording stays on the board. Reconnect to see the real state.");
+    });
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(UUID.service);
+    commandChr = await service.getCharacteristic(UUID.command);
+
+    const handlers = {
+      live: onLive, status: onStatus, offset: onOffset, data: onData, meta: onMeta
+    };
+    const characteristics = {};
+    for (const name of Object.keys(handlers)) {
+      characteristics[name] = await service.getCharacteristic(UUID[name]);
+      characteristics[name].addEventListener("characteristicvaluechanged", handlers[name]);
+    }
+    for (const name of Object.keys(handlers)) await characteristics[name].startNotifications();
+
+    connected = true;
+    updateButtons();
+    setConnectionPill(true);
+    sendCommand("M");
+    setState("Connected", "Ready. A new recording replaces the previous one.");
+  } catch (e) {
+    alert("Connection failed: " + e.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Notification handlers
+// ---------------------------------------------------------------------------
+function onStatus(e) {
+  const s = new TextDecoder().decode(e.target.value);
+
+  if (s === "CALIBRATING") {
+    calibrating = true;
+    const t0 = performance.now();
+    const timer = setInterval(() => {
+      const p = (performance.now() - t0) / 50;   // 5000 ms -> 100 %
+      $("fill").style.width = Math.min(100, p) + "%";
+      if (p >= 100) clearInterval(timer);
+    }, 50);
+    setState("Calibrating…", "Keep the board still for 5 seconds.");
+  }
+  if (s === "CALIBRATED") {
+    calibrating = false;
+    $("fill").style.width = "100%";
+    setState("Calibration complete", "Gyro offset stored.");
+    updateButtons();
+  }
+  if (s === "RECORDING") {
+    recording = true;
+    liveSamples = 0; storedSamples = 0; storedBytes = 0;
+    firstT = lastT = null; history = [];
+    renderStored();
+    setState("● RECORDING", "Recording on the board (100 Hz).");
+    updateButtons();
+  }
+  if (s === "SAVED") {
+    recording = false;
+    renderStored();
+    sendCommand("M");
+    setState("Recording saved", "Kept on the board (lost if the board is powered off).");
+    updateButtons();
+  }
+  if (s === "FULL") {
+    setState("Memory full", "60 s reached: recording stopped and kept.");
+  }
+  if (s === "DOWNLOAD") {
+    transferring = true;
+    chunks = [];
+    setState("Downloading…", "Reading the recording from the board.");
+    updateButtons();
+  }
+  if (s === "DOWNLOAD_DONE") {
+    transferring = false;
+    const got = chunks.reduce((a, c) => a + c.length, 0);
+    const result = buildCsv();
+    saveCsv(result);
+    if (!result || got !== storedBytes || result.rows !== result.count) {
+      setState("CSV incomplete ⚠️", `Received ${got} / ${storedBytes} bytes. Download again.`);
+    } else {
+      setState("CSV downloaded", `${result.rows} samples (still kept on the board while it stays powered).`);
+    }
+    updateButtons();
+  }
+  if (s === "NO_DATA") {
+    transferring = false;
+    storedSamples = 0;
+    renderStored();
+    updateButtons();
+    setState("No recording", "Make a recording first.");
+  }
+  if (s === "TRANSFER_ERROR") {
+    transferring = false;
+    updateButtons();
+    setState("Transfer error", "Could not send the recording. Try again.");
+  }
+  if (s === "BUSY") {
+    setState("Board busy", "Wait for the current operation to finish.");
+  }
+}
+
+function onMeta(e) {
+  const v = view(e);
+  storedSamples = v.getUint32(0, true);
+  storedBytes = v.getUint32(4, true);
+  renderStored();
+  updateButtons();
+}
+
+function onOffset(e) {
+  const v = view(e);
+  ["ox", "oy", "oz"].forEach((id, i) => $(id).textContent = fixed(v.getFloat32(i * 4, true), 4) + " °/s");
+  ["sx", "sy", "sz"].forEach((id, i) => $(id).textContent = fixed(v.getFloat32(12 + i * 4, true), 4));
+}
+
+// Live packet layout: see docs/PROTOCOL.md
+function onLive(e) {
+  const v = view(e);
+  const seq = v.getUint32(0, true), t = v.getUint32(4, true);
+  const ax = v.getInt16(8, true) / 1000, ay = v.getInt16(10, true) / 1000, az = v.getInt16(12, true) / 1000;
+  const gx = v.getInt16(20, true) / 10, gy = v.getInt16(22, true) / 10, gz = v.getInt16(24, true) / 10; // corrected
+  const temp = v.getInt16(26, true) / 100;
+
+  liveSamples = seq + 1;
+  if (firstT === null) firstT = t;
+  lastT = t;
+  const sec = (lastT - firstT) / 1e6;
+
+  $("count").textContent = liveSamples.toLocaleString("en-US");
+  $("ax").textContent = fixed(ax, 3); $("ay").textContent = fixed(ay, 3); $("az").textContent = fixed(az, 3);
+  $("an").textContent = fixed(Math.hypot(ax, ay, az), 3);
+  $("gx").textContent = fixed(gx); $("gy").textContent = fixed(gy); $("gz").textContent = fixed(gz);
+  $("temp").textContent = fixed(temp) + " °C";
+  $("rate").textContent = sec > 0 ? (liveSamples / sec).toFixed(1) + " Hz" : "—";
+  $("dur").textContent = new Date(sec * 1000).toISOString().substr(14, 5);
+  if (recording) renderStored();
+
+  history.push({ t, ax, ay, az, gx, gy, gz });
+  while (history.length && t - history[0].t > CHART_WINDOW_US) history.shift();
+}
+
+function onData(e) {
+  const v = e.target.value;
+  chunks.push(new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength)));
+}
+
+// ---------------------------------------------------------------------------
+// Download: rebuild a CSV from the binary stream
+// ---------------------------------------------------------------------------
+function buildCsv() {
+  const total = chunks.reduce((a, c) => a + c.length, 0);
+  const bytes = new Uint8Array(total);
+  let p = 0;
+  for (const c of chunks) { bytes.set(c, p); p += c.length; }
+  const v = new DataView(bytes.buffer);
+  if (total < HEADER_SIZE || v.getUint32(0, true) !== HEADER_MAGIC) return null;
+
+  const count = v.getUint32(4, true);
+  const offX = v.getFloat32(8, true), offY = v.getFloat32(12, true), offZ = v.getFloat32(16, true);
+  const rows = Math.min(count, Math.floor((total - HEADER_SIZE) / RECORD_SIZE));
+
+  const lines = ["sequence,timestamp_us,temperature_C,ax_g,ay_g,az_g," +
+                 "gx_raw_dps,gy_raw_dps,gz_raw_dps,gx_corrected_dps,gy_corrected_dps,gz_corrected_dps"];
+  for (let i = 0; i < rows; i++) {
+    const b = HEADER_SIZE + i * RECORD_SIZE;
+    const t = v.getUint32(b, true);
+    const ax = v.getInt16(b + 4, true) / 8000, ay = v.getInt16(b + 6, true) / 8000, az = v.getInt16(b + 8, true) / 8000;
+    const gx = v.getInt16(b + 10, true) / 64, gy = v.getInt16(b + 12, true) / 64, gz = v.getInt16(b + 14, true) / 64;
+    const temp = v.getInt16(b + 16, true) / 100;
+    lines.push([i, t, temp.toFixed(2), ax.toFixed(5), ay.toFixed(5), az.toFixed(5),
+                gx.toFixed(3), gy.toFixed(3), gz.toFixed(3),
+                (gx - offX).toFixed(3), (gy - offY).toFixed(3), (gz - offZ).toFixed(3)].join(","));
+  }
+  return { csv: lines.join("\n") + "\n", rows, count };
+}
+
+function saveCsv(result) {
+  if (!result) return;
+  const d = new Date(), z = x => String(x).padStart(2, "0");
+  const name = `imu_log_${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}-${z(d.getMinutes())}.csv`;
+  const url = URL.createObjectURL(new Blob(["\ufeff", result.csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function download() {
+  if (storedSamples) { chunks = []; sendCommand("D"); }
+}
+
+// ---------------------------------------------------------------------------
+// Buttons
+// ---------------------------------------------------------------------------
+$("connect").onclick = connect;
+$("cal").onclick = () => confirm("Keep the board still for 5 seconds?") && sendCommand("C");
+$("start").onclick = () => confirm("Start a new recording? The previous one will be replaced.") && sendCommand("S");
+$("stop").onclick = () => sendCommand("E");
+$("dl").onclick = download;
+
+// ---------------------------------------------------------------------------
+// Live chart (accelerometer in g, gyroscope scaled by 1/20)
+// ---------------------------------------------------------------------------
+const canvas = $("chart"), ctx = canvas.getContext("2d");
+const SERIES = [["ax", 1, "#5aaaff"], ["ay", 1, "#35d07f"], ["az", 1, "#ffb454"],
+                ["gx", 20, "#54e6ff"], ["gy", 20, "#c58cff"], ["gz", 20, "#ff6575"]];
+
+function drawChart() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "#1b3048";
+  for (let i = 1; i < 5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, i * canvas.height / 5);
+    ctx.lineTo(canvas.width, i * canvas.height / 5);
+    ctx.stroke();
+  }
+  if (history.length) {
+    const t0 = history[0].t, span = Math.max(1000, history[history.length - 1].t - t0);
+    let max = 0.1;
+    for (const p of history) for (const [key, div] of SERIES) max = Math.max(max, Math.abs(p[key]) / div);
+    max = Math.ceil(max * 1.2 * 10) / 10;
+    for (const [key, div, color] of SERIES) {
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      history.forEach((p, i) => {
+        const x = (p.t - t0) / span * canvas.width;
+        const y = canvas.height / 2 - p[key] / div / max * canvas.height * 0.43;
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#8fa5bd";
+    ctx.font = "11px system-ui";
+    ctx.fillText("scale ±" + max.toFixed(1), 8, 16);
+  }
+  requestAnimationFrame(drawChart);
+}
+drawChart();
+updateButtons();
+</script>
+</body>
+</html>
