@@ -25,9 +25,6 @@ The dashboard provides:
 | The board | The dashboard |
 |:---:|:---:|
 | <img src="docs/images/board.jpg" alt="The Seeed Studio XIAO nRF52840 Sense board" width="220"> | <img src="docs/images/dashboard.png" alt="The web dashboard" width="210"> |
-
-> Board photo: Seeed Studio XIAO nRF52840 Sense product image. Swap `docs/images/board.jpg` for your own photo of the wired-up board if you'd rather avoid using a vendor product shot.
-
 ---
 
 ## 🚀 Quick start
