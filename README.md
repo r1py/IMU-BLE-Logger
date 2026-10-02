@@ -1,4 +1,4 @@
-# IMU BLE Logger — Inertial Measurement Unit · Bluetooth Low Energy
+# IMU BLE Logger: Inertial Measurement Unit data logger with Bluetooth Low Energy control and web-based download
 
 [![Open the dashboard](https://img.shields.io/badge/Open%20the%20dashboard-r1py.github.io-35d07f?style=for-the-badge)](https://r1py.github.io/IMU-BLE-Logger/web/)
 
