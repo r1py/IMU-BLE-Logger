@@ -1,19 +1,80 @@
-# IMU BLE Logger
+# IMU BLE Logger — Inertial Measurement Unit · Bluetooth Low Energy
 
-A wireless **6-axis motion and vibration recorder** built on the Seeed XIAO nRF52840 Sense, controlled from a phone or laptop browser over Bluetooth Low Energy. No app to install, no cable, no cloud.
+[![Open the dashboard](https://img.shields.io/badge/Open%20the%20dashboard-r1py.github.io-35d07f?style=for-the-badge)](https://r1py.github.io/IMU-BLE-Logger/web/)
 
-Put the board on a vehicle, machine, or any moving object; press **New recording** in a web page; get a clean **100 Hz CSV** of acceleration, angular rate, and temperature.
+A compact, battery-powered **wireless 6-axis IMU data logger** for measuring motion, vibration, and angular rotation on a vehicle, machine, or other moving object.
 
-<p align="center">
-  <b>Board (firmware)</b> &nbsp;⇄&nbsp; <b>BLE</b> &nbsp;⇄&nbsp; <b>Web dashboard (Chrome)</b> &nbsp;→&nbsp; <b>CSV</b>
-</p>
+Built on the **Seeed XIAO nRF52840 Sense**, it records:
+
+- **3-axis acceleration**
+- **3-axis gyroscope data**
+- **Temperature**
+- **100 Hz sampling rate**
+
+Measurements are stored directly on the device and can be controlled through a **Bluetooth Low Energy (BLE) web dashboard** from a phone or laptop.
+
+The dashboard provides:
+
+- **Sensor calibration**
+- **Live data monitoring**
+- **Measurement start/stop control**
+- **CSV data export**
+
+**No app to install · No cable · No cloud required**
+
+| The board | The dashboard |
+|:---:|:---:|
+| <img src="docs/images/board.jpg" alt="The Seeed Studio XIAO nRF52840 Sense board" width="220"> | <img src="docs/images/dashboard.png" alt="The web dashboard" width="210"> |
+
+> Board photo: Seeed Studio XIAO nRF52840 Sense product image. Swap `docs/images/board.jpg` for your own photo of the wired-up board if you'd rather avoid using a vendor product shot.
+
+---
+
+## 🚀 Quick start
+
+You need **Arduino IDE**, the firmware from this repository, and **Chrome or Edge** for the dashboard.
+
+### First use: flash the board
+
+1. Install the [Arduino IDE](https://www.arduino.cc/en/software) (2.x recommended).
+2. Add the Seeed board index URL in *File → Preferences → Additional boards manager URLs*:
+   `https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json`
+3. In *Boards Manager*, install **Seeed nRF52 Boards** (the non-mbed variant).
+4. In *Library Manager*, install **Seeed Arduino LSM6DS3**.
+5. Select **Seeed XIAO nRF52840 Sense**.
+6. Open `firmware/imu_ble_logger/imu_ble_logger.ino`.
+7. Connect the XIAO by USB and click **Upload**.
+8. Once the upload is complete, disconnect USB if you want to power the board from a battery.
+
+### Make a measurement
+
+1. **Power the board** (USB or battery).
+2. **Open the dashboard:** 👉 **<https://r1py.github.io/IMU-BLE-Logger/web/>**
+3. Tap **Bluetooth** and select **`IMU-LOGGER`**.
+4. Put the board still and tap **Calibrate 5 s**.
+5. Tap **New recording**, perform your experiment, then tap **Stop**.
+6. Tap **Download CSV**. You get `imu_log_<date>.csv` at 100 Hz.
+
+The dashboard is only the control and visualization interface. The recording itself is stored on the board's RAM, so losing the Bluetooth connection does not interrupt it.
+
+> **Good to know**
+> - Works on **Android, Windows, macOS, Linux, ChromeOS** with Chrome or Edge. Not on iPhone/iPad Safari (see [browser compatibility](#browser-compatibility)).
+> - Up to **60 s per recording**. The recording is stored on the board, so it survives a phone disconnection, but it is **lost if the board is powered off**. Download before unplugging.
+> - The live values only move **while recording**.
+
+**Don't have the firmware on the board yet?** Follow [Installation](#installation): it takes about 10 minutes, once.
+
+---
 
 ## Table of contents
 
+- [Quick start](#-quick-start)
 - [Features](#features)
 - [How it works](#how-it-works)
 - [Hardware](#hardware)
-- [Quick start](#quick-start)
+- [Installation](#installation)
+  - [1. Flash the firmware](#1-flash-the-firmware)
+  - [2. Choose how to run the dashboard](#2-choose-how-to-run-the-dashboard)
 - [Using the dashboard](#using-the-dashboard)
 - [CSV format](#csv-format)
 - [Configuration](#configuration)
@@ -32,7 +93,7 @@ Put the board on a vehicle, machine, or any moving object; press **New recording
 - **Live view** (10 Hz) of the acceleration and the gyroscope, with a 10 s scrolling chart.
 - **Gyroscope calibration**: a 5 s stillness measurement estimates the gyro offset and its standard deviation; both raw and offset-corrected angular rates are exported.
 - **Reliable download** of the full-rate recording, with an integrity check (byte count and sample count) that warns you if anything went missing.
-- **Zero install**: the dashboard is a single static HTML file using the Web Bluetooth API.
+- **Zero install for users**: the dashboard is a single static HTML file using the Web Bluetooth API, hosted on GitHub Pages.
 - **Self-resynchronizing**: reconnect at any time (even mid-recording) and the dashboard shows the real state of the board.
 
 ## How it works
@@ -68,7 +129,9 @@ The BLE protocol (services, packets, commands) is fully documented in [`docs/PRO
 
 No external wiring is needed.
 
-## Quick start
+## Installation
+
+Two things are needed: the **firmware** on the board (once), and a **dashboard** to talk to it. For most people the dashboard is the hosted page, so only step 1 is real work.
 
 ### 1. Flash the firmware
 
@@ -78,27 +141,49 @@ No external wiring is needed.
 3. In *Boards Manager*, install **Seeed nRF52 Boards** (the non-mbed variant, which ships the Adafruit Bluefruit library).
 4. In *Library Manager*, install **Seeed Arduino LSM6DS3**.
 5. Select the board **Seeed XIAO nRF52840 Sense**.
-6. Open `firmware/imu_ble_logger/imu_ble_logger.ino` and click **Upload**.
-7. (Optional) Open the Serial Monitor at 115200 baud to see recording and download diagnostics.
+6. Get the code: `git clone https://github.com/r1py/IMU-BLE-Logger.git` (or *Code → Download ZIP* on GitHub).
+7. Open `firmware/imu_ble_logger/imu_ble_logger.ino` and click **Upload**.
+8. *(Optional)* Open the Serial Monitor at 115200 baud to see recording and download diagnostics.
 
 > The sketch was written against the Bluefruit API shipped with the Seeed nRF52 core (`Bluefruit.Periph.setConnectCallback`, `Bluefruit.Connection(handle)->getMtu()`, ...). If a future core renames these calls, check the headers in the installed core (`libraries/Bluefruit/src/`) rather than the online Adafruit documentation, which may describe a newer version.
 
-### 2. Open the dashboard
+### 2. Choose how to run the dashboard
 
-Web Bluetooth only works in a **secure context**: `https://` or `http://localhost`. Pick one:
+Web Bluetooth only works in a **secure context**: `https://` or `http://localhost`. Four ways, from simplest to most flexible:
 
-- **GitHub Pages** (recommended for phones): push this repository, enable *Settings → Pages* on the `main` branch, and open `https://<user>.github.io/<repo>/web/`.
-- **Local**: from the repository root run `python3 -m http.server 8000`, then open `http://localhost:8000/web/` on the same computer.
-- **Phone with a local server**: on Android you can use Chrome's port forwarding (`chrome://inspect`) to expose the computer's `localhost` to the phone.
+#### Option A: the hosted dashboard (recommended)
+
+Open **<https://r1py.github.io/IMU-BLE-Logger/web/>**. Nothing else to do.
+
+This page is served over HTTPS by GitHub Pages straight from this repository, so it always matches the latest `main` branch. The version number is shown in the page footer.
+
+> It looks for a device named exactly `IMU-LOGGER`. If you changed `DEVICE_NAME` in the firmware, or modified the protocol, use option B or C with your own copy of the page.
+
+#### Option B: your own copy on GitHub Pages (fork)
+
+Use this to customize the dashboard, change the device name, or keep a stable version.
+
+1. **Fork** this repository on GitHub.
+2. In your fork: *Settings → Pages → Build and deployment → Source: **Deploy from a branch***, then choose branch **`main`** and folder **`/ (root)`**, and save.
+3. After a minute, your dashboard is at `https://<your-user>.github.io/<your-repo>/web/`.
+
+Any commit you push to `main` is redeployed automatically. (GitHub Pages is free for public repositories.)
+
+#### Option C: local server on a computer
+
+From the repository root:
+
+```console
+python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000/web/` in Chrome or Edge on the same computer. `localhost` counts as a secure context, so Web Bluetooth works without HTTPS.
+
+#### Option D: local server with a phone
+
+Run option C on your computer, connect the phone by USB with USB debugging enabled, open `chrome://inspect/#devices` on the computer, add the port `8000` under *Port forwarding*, then open `http://localhost:8000/web/` in Chrome **on the phone**.
 
 > Do not open `index.html` by double-clicking it (`file://`): Chrome blocks Web Bluetooth there.
-
-### 3. Record
-
-1. Press **Bluetooth** and select `IMU-LOGGER`.
-2. (Recommended) Put the board still and press **Calibrate 5 s**.
-3. Press **New recording**, do your experiment, press **Stop**.
-4. Press **Download CSV**.
 
 ## Using the dashboard
 
@@ -149,7 +234,7 @@ Compile-time settings at the top of `imu_ble_logger.ino`:
 
 | Constant | Default | Meaning |
 |---|---|---|
-| `DEVICE_NAME` | `IMU-LOGGER` | BLE name. The dashboard filters on it (`DEVICE_NAME` in `web/index.html`), so change both. |
+| `DEVICE_NAME` | `IMU-LOGGER` | BLE name. The dashboard filters on it (`DEVICE_NAME` in `web/index.html`), so change both, and use your own copy of the page ([option B or C](#2-choose-how-to-run-the-dashboard)). |
 | `MAX_SAMPLES` | `6000` | Buffer size: 6000 samples = 60 s at 100 Hz = 108 KB of RAM. The nRF52840 has 256 KB; raise it gradually and watch the compiler's RAM report. The dashboard capacity text says "60 s", update it too. |
 | `LIVE_DIVIDER` | `10` | One live packet per N samples (10 → 10 Hz). Lowering it increases BLE load and can disturb sampling. |
 | `SAMPLE_PERIOD_US` | `10000` | Sampling period (100 Hz). If you change it, also update `SAMPLE_RATE` in `web/index.html`. |
@@ -219,7 +304,8 @@ Binary records are 4.7× smaller than CSV text (18 vs ~84 bytes per sample), whi
 | **"Web Bluetooth is not available".** | Use Chrome/Edge (Android, Windows, macOS, Linux, ChromeOS) over `https://` or `localhost`. iOS browsers do not support Web Bluetooth. |
 | **Dashboard values stay empty.** | Live packets are only sent **while recording**. Press *New recording*. If they still do not update, the MTU may not have been negotiated: update the Seeed core and the browser. |
 | **"CSV incomplete" warning.** | The received byte count differs from the board's. Download again (the recording is still on the board). Open the Serial Monitor: a `[DL] aborted` line gives the reason. |
-| **The downloaded `.csv` looks like binary garbage (starts with `IMU1`).** | The page you opened is an old version of `index.html` that does not convert the binary stream. Replace the hosted file and hard-refresh the page (clear the site's cache). |
+| **The downloaded `.csv` looks like binary garbage (starts with `IMU1`).** | The page you opened is an old, cached version that does not convert the binary stream. Hard-refresh the page (or clear the site data) and check the version in the footer. |
+| **The page seems outdated after an update.** | Browsers cache pages. Reload without cache (Ctrl+Shift+R, or clear the site data on Android). The footer shows the running version. |
 | **The connection pill says "Disconnected" but the board is running.** | Reload the page and reconnect. The recording on the board is unaffected. |
 | **`IMU_ERROR` status.** | The LSM6DS3 was not found at `0x6A`. Make sure you have the **Sense** variant. |
 | **Compile error: `Bluefruit.Gap` / `setConnectCallback` not found.** | You are using a different core than the Seeed nRF52 one. Use *Seeed nRF52 Boards*, or adapt the callback registration to your core's Bluefruit version. |
@@ -237,14 +323,17 @@ Binary records are 4.7× smaller than CSV text (18 vs ~84 bytes per sample), whi
 ## Project structure
 
 ```
-imu-ble-logger/
+IMU-BLE-Logger/
 ├── firmware/
 │   └── imu_ble_logger/
 │       └── imu_ble_logger.ino   # Arduino sketch for the XIAO nRF52840 Sense
 ├── web/
-│   └── index.html               # Single-file Web Bluetooth dashboard
+│   └── index.html               # Single-file Web Bluetooth dashboard (hosted on GitHub Pages)
 ├── docs/
-│   └── PROTOCOL.md              # BLE services, packets, commands, download format
+│   ├── PROTOCOL.md              # BLE services, packets, commands, download format
+│   └── images/
+│       ├── board.jpg            # Photo of the board (README)
+│       └── dashboard.png        # Screenshot of the dashboard (README)
 ├── tools/
 │   └── check_sampling.py        # Sampling-rate / gap analysis of an exported CSV
 ├── examples/
